@@ -1,5 +1,6 @@
 import url from "url";
 import querystring from "querystring";
+import { destr, safeDestr } from "destr";
 
 function parseUrls(urlStrings) {
   const panjang = urlStrings.length;
@@ -9,7 +10,8 @@ function parseUrls(urlStrings) {
   const parseVmessUrl = (parsedUrl) => {
     let encoded = parsedUrl.substring(8);
     let decodeResult = atob(encoded);
-    let parsedJSON = JSON.parse(decodeResult);
+    // let parsedJSON = JSON.parse(decodeResult);
+    let parsedJSON = destr(decodeResult)
     const configResult = {
       tag: parsedJSON.ps,
       type: "vmess",
@@ -79,20 +81,21 @@ function parseUrls(urlStrings) {
       };
     }
 
-    if (query.type === "ws") {
-      configResult.transport = {
+    const transportTypes = {
+      ws: {
         type: query.type,
         path: query.path,
         headers: {
           Host: query.host
         }
-      };
-    } else if (query.type === "grpc") {
-      configResult.transport = {
+      },
+      grpc: {
         type: query.type,
         service_name: query.serviceName
-      };
-    }
+      }
+    };
+
+    configResult.transport = transportTypes[query.type];
 
     return configResult;
   };
@@ -410,9 +413,8 @@ const urlStrings = [
 const startTime = performance.now();
 const results = parseUrls(urlStrings);
 const endTime = performance.now();
-console.log(results);
+let diff = endTime - startTime;
+//console.log(results);
 const jsonResult = JSON.stringify(results, null, 4);
 console.log(jsonResult);
-
-let diff = endTime - startTime;
 console.log(diff, "ms");

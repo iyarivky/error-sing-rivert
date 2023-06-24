@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "destr": "^2.0.0",
+    "esmify": "^2.1.1",
+    "querystring": "^0.2.1",
+    "url": "^0.11.1"
+  },
+  "type": "module"
+}
