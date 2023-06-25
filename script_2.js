@@ -1,17 +1,12 @@
-import querystring from "querystring";
-import {destr} from "destr";
-
 function parseUrls(vrayUrls,httpUrls) {
   const vrayUrlsLength = vrayUrls.length;
-  //const results = new Array(panjang).fill(0)
   const results = [];
 
-  const parseVmessUrl = (parsedUrl) => {
-    let href = parsedUrl.href
+  const parseVmessUrl = (vrayParsedUrl,httpParsedUrl) => {
+    let href = vrayParsedUrl.href
     let encoded = href.substring(8);
     let decodeResult = atob(encoded);
     let parsedJSON = JSON.parse(decodeResult);
-    //let parsedJSON = destr(decodeResult)
     const configResult = {
       tag: parsedJSON.ps,
       type: "vmess",
@@ -56,15 +51,13 @@ function parseUrls(vrayUrls,httpUrls) {
     return configResult;
   };
 
-  const parseVlessUrl = (parsedUrl, query) => {
+  const parseVlessUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.substring(1),
-      //tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.substring(0, parsedUrl.protocol.length - 1),
-      //type: parsedUrl.protocol.replace(":", ""),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10),
-      uuid: parsedUrl.auth,
+      tag: httpParsedUrl.hash.substring(1),
+      type: "vless",
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10),
+      uuid: httpParsedUrl.username,
       flow: "",
       packet_encoding: "xudp",
       multiplex: {
@@ -74,10 +67,10 @@ function parseUrls(vrayUrls,httpUrls) {
       }
     };
 
-    if (parsedUrl.port === "443" || parsedUrl.searchParams.get("security") === "tls") {
+    if (httpParsedUrl.port === "443" || httpParsedUrl.searchParams.get("security") === "tls") {
       configResult.tls = {
         enable: true,
-        server_name: parsedUrl.searchParams.get("sni"),
+        server_name: httpParsedUrl.searchParams.get("sni"),
         insecure: true,
         disable_sni: false
       };
@@ -85,31 +78,30 @@ function parseUrls(vrayUrls,httpUrls) {
 
     const transportTypes = {
       ws: {
-        type: parsedUrl.searchParams.get("type"),
-        path: parsedUrl.searchParams.get("path"),
+        type: httpParsedUrl.searchParams.get("type"),
+        path: httpParsedUrl.searchParams.get("path"),
         headers: {
-          Host: parsedUrl.searchParams.get("host")
+          Host: httpParsedUrl.searchParams.get("host")
         }
       },
       grpc: {
-        type: parsedUrl.searchParams.get("type"),
-        service_name: parsedUrl.searchParams.get("serviceName")
+        type: httpParsedUrl.searchParams.get("type"),
+        service_name: httpParsedUrl.searchParams.get("serviceName")
       }
     };
 
-    configResult.transport = transportTypes[parsedUrl.searchParams.get("type")];
+    configResult.transport = transportTypes[httpParsedUrl.searchParams.get("type")];
 
     return configResult;
   };
 
-  const parseTrojanUrl = (parsedUrl, query) => {
+  const parseTrojanUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.substring(1),
-      // tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.substring(0, parsedUrl.protocol.length - 1),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10),
-      password: parsedUrl.auth,
+      tag: httpParsedUrl.hash.substring(1),
+      type: "trojan",
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10),
+      password: httpParsedUrl.username,
       multiplex: {
         enable: false,
         protocol: "smux",
@@ -117,10 +109,10 @@ function parseUrls(vrayUrls,httpUrls) {
       }
     };
 
-    if (parsedUrl.port === "443" || parsedUrl.searchParams.get("security") === "tls") {
+    if (httpParsedUrl.port === "443" || httpParsedUrl.searchParams.get("security") === "tls") {
       configResult.tls = {
         enable: true,
-        server_name: parsedUrl.searchParams.get("sni"),
+        server_name: httpParsedUrl.searchParams.get("sni"),
         insecure: true,
         disable_sni: false
       };
@@ -128,56 +120,56 @@ function parseUrls(vrayUrls,httpUrls) {
 
     const transportTypes = {
       ws: {
-        type: parsedUrl.searchParams.get("type"),
-        path: parsedUrl.searchParams.get("path"),
+        type: httpParsedUrl.searchParams.get("type"),
+        path: httpParsedUrl.searchParams.get("path"),
         headers: {
-          Host: parsedUrl.searchParams.get("host")
+          Host: httpParsedUrl.searchParams.get("host")
         }
       },
       grpc: {
-        type: parsedUrl.searchParams.get("type"),
-        service_name: parsedUrl.searchParams.get("serviceName")
+        type: httpParsedUrl.searchParams.get("type"),
+        service_name: httpParsedUrl.searchParams.get("serviceName")
       }
     };
 
-    configResult.transport = transportTypes[parsedUrl.searchParams.get("type")];
+    configResult.transport = transportTypes[httpParsedUrl.searchParams.get("type")];
 
     return configResult;
   };
 
-  const parseShadowsocksUrl = (parsedUrl, query) => {
+  const parseShadowsocksUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.replace(":", ""),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10)
+      tag: httpParsedUrl.hash.replace("#", ""),
+      type: httpParsedUrl.protocol.replace(":", ""),
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10)
     };
     return configResult;
   };
-  const parseShadowsocksRUrl = (parsedUrl, query) => {
+  const parseShadowsocksRUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.replace(":", ""),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10)
+      tag: httpParsedUrl.hash.replace("#", ""),
+      type: httpParsedUrl.protocol.replace(":", ""),
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10)
     };
     return configResult;
   };
-  const parseSocksUrl = (parsedUrl, query) => {
+  const parseSocksUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.replace(":", ""),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10)
+      tag: httpParsedUrl.hash.replace("#", ""),
+      type: httpParsedUrl.protocol.replace(":", ""),
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10)
     };
     return configResult;
   };
-  const parseHttpUrl = (parsedUrl, query) => {
+  const parseHttpUrl = (vrayParsedUrl,httpParsedUrl) => {
     const configResult = {
-      tag: parsedUrl.hash.replace("#", ""),
-      type: parsedUrl.protocol.replace(":", ""),
-      server: parsedUrl.hostname,
-      server_port: parseInt(parsedUrl.port, 10)
+      tag: httpParsedUrl.hash.replace("#", ""),
+      type: httpParsedUrl.protocol.replace(":", ""),
+      server: httpParsedUrl.hostname,
+      server_port: parseInt(httpParsedUrl.port, 10)
     };
     return configResult;
   };
@@ -185,13 +177,13 @@ function parseUrls(vrayUrls,httpUrls) {
   // for (const urlString of urlStrings) <= slow
 
   const protocolMap = {
-    "vmess:": (vrayParsedUrl,httpParsedUrl) => parseVmessUrl(vrayParsedUrl,httpParsedUrl),
-    "vless:": (vrayParsedUrl,httpParsedUrl) => parseVlessUrl(vrayParsedUrl,httpParsedUrl),
-    "trojan:": (vrayParsedUrl,httpParsedUrl) => parseTrojanUrl(vrayParsedUrl,httpParsedUrl),
-    "ss:": (vrayParsedUrl,httpParsedUrl) => parseShadowsocksUrl(vrayParsedUrl,httpParsedUrl),
-    "ssr:": (vrayParsedUrl,httpParsedUrl) => parseShadowsocksRUrl(vrayParsedUrl,httpParsedUrl),
-    "socks5:": (vrayParsedUrl,httpParsedUrl) => parseSocksUrl(vrayParsedUrl,httpParsedUrl),
-    "http:": (vrayParsedUrl,httpParsedUrl) => parseHttpUrl(vrayParsedUrl,httpParsedUrl)
+    "vmess:": parseVmessUrl,
+    "vless:": parseVlessUrl,
+    "trojan:": parseTrojanUrl,
+    "ss:": parseShadowsocksUrl,
+    "ssr:": parseShadowsocksRUrl,
+    "socks5:": parseSocksUrl,
+    "http:": parseHttpUrl
   };
   
   for (let i = 0; i < vrayUrlsLength; i++) {
@@ -199,17 +191,15 @@ function parseUrls(vrayUrls,httpUrls) {
     const httpString = httpUrls[i];
     const vrayParsedUrl = new URL(vrayString);
     const httpParsedUrl = new URL(httpString);
-    //const query = querystring.parse(parsedUrl.query);
   
     let configResult;
   
-    if (protocolMap.hasOwnProperty(vrayParsedUrl.protocol)) {
-      configResult = protocolMap[vrayParsedUrl.protocol](vrayParsedUrl,httpParsedUrl);
+    const protocolHandler = protocolMap[vrayParsedUrl.protocol];
+    if (protocolHandler) {
+      configResult = protocolHandler(vrayParsedUrl, httpParsedUrl);
     } else {
       console.log("Unsupported Protocol!")
     }
-  
-    //results.push(configResult); <= this more slower
     const panjangResult = results.length;
     results[panjangResult] = configResult;
   }
@@ -227,13 +217,12 @@ const vrayUrls = [
   "trojan://6d9fdac3-d74b-435f-aa6b-5fbf36e06853@sg1.xvless.xyz:443?host=sg1.xvless.xyz&path=%2Ftrojan&sni=sg1.xvless.xyz&type=ws#sshocean-ainian",
   "trojan://dbedf072-d917-41cd-b106-3aa3bb2f29a4@idt4.sshocean.net:443?mode=gun&security=tls&type=grpc&serviceName=grpc&sni=sni.cloudflare.net#sshocean-pengentest_Trojan_gRPC"
 ];
-const httpUrls = vrayUrls.map(urlString => urlString.replace(/^[^:]+(?=:\/\/)/, 'http')); //convert v2ray urls to http url since WHATWG URL API is suck when dealing with other protocol
+const httpUrls = vrayUrls.map(urlString => urlString.replace(/^[^:]+(?=:\/\/)/, 'ftp')); //convert v2ray urls to http url since WHATWG URL API is suck when dealing with other protocol
 
 const startTime = performance.now();
 const results = parseUrls(vrayUrls,httpUrls);
 const endTime = performance.now();
 let diff = endTime - startTime;
-//console.log(results);
 const jsonResult = JSON.stringify(results, null, 4);
 console.log(jsonResult);
 console.log(diff, "ms");
