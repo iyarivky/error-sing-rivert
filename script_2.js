@@ -1,17 +1,17 @@
-import url from "url";
 import querystring from "querystring";
 import {destr} from "destr";
 
-function parseUrls(urlStrings) {
-  const panjang = urlStrings.length;
+function parseUrls(vrayUrls,httpUrls) {
+  const vrayUrlsLength = vrayUrls.length;
   //const results = new Array(panjang).fill(0)
   const results = [];
 
   const parseVmessUrl = (parsedUrl) => {
-    let encoded = parsedUrl.substring(8);
+    let href = parsedUrl.href
+    let encoded = href.substring(8);
     let decodeResult = atob(encoded);
-    // let parsedJSON = JSON.parse(decodeResult); <== more slower than use destr
-    let parsedJSON = destr(decodeResult)
+    let parsedJSON = JSON.parse(decodeResult);
+    //let parsedJSON = destr(decodeResult)
     const configResult = {
       tag: parsedJSON.ps,
       type: "vmess",
@@ -74,10 +74,10 @@ function parseUrls(urlStrings) {
       }
     };
 
-    if (parsedUrl.port === "443" || query.security === "tls") {
+    if (parsedUrl.port === "443" || parsedUrl.searchParams.get("security") === "tls") {
       configResult.tls = {
         enable: true,
-        server_name: query.sni,
+        server_name: parsedUrl.searchParams.get("sni"),
         insecure: true,
         disable_sni: false
       };
@@ -85,19 +85,19 @@ function parseUrls(urlStrings) {
 
     const transportTypes = {
       ws: {
-        type: query.type,
-        path: query.path,
+        type: parsedUrl.searchParams.get("type"),
+        path: parsedUrl.searchParams.get("path"),
         headers: {
-          Host: query.host
+          Host: parsedUrl.searchParams.get("host")
         }
       },
       grpc: {
-        type: query.type,
-        service_name: query.serviceName
+        type: parsedUrl.searchParams.get("type"),
+        service_name: parsedUrl.searchParams.get("serviceName")
       }
     };
 
-    configResult.transport = transportTypes[query.type];
+    configResult.transport = transportTypes[parsedUrl.searchParams.get("type")];
 
     return configResult;
   };
@@ -117,10 +117,10 @@ function parseUrls(urlStrings) {
       }
     };
 
-    if (parsedUrl.port === "443" || query.security === "tls") {
+    if (parsedUrl.port === "443" || parsedUrl.searchParams.get("security") === "tls") {
       configResult.tls = {
         enable: true,
-        server_name: query.sni,
+        server_name: parsedUrl.searchParams.get("sni"),
         insecure: true,
         disable_sni: false
       };
@@ -128,19 +128,19 @@ function parseUrls(urlStrings) {
 
     const transportTypes = {
       ws: {
-        type: query.type,
-        path: query.path,
+        type: parsedUrl.searchParams.get("type"),
+        path: parsedUrl.searchParams.get("path"),
         headers: {
-          Host: query.host
+          Host: parsedUrl.searchParams.get("host")
         }
       },
       grpc: {
-        type: query.type,
-        service_name: query.serviceName
+        type: parsedUrl.searchParams.get("type"),
+        service_name: parsedUrl.searchParams.get("serviceName")
       }
     };
 
-    configResult.transport = transportTypes[query.type];
+    configResult.transport = transportTypes[parsedUrl.searchParams.get("type")];
 
     return configResult;
   };
@@ -184,27 +184,31 @@ function parseUrls(urlStrings) {
   // for (let i = 0; i < urlStrings.length; i++)
   // for (const urlString of urlStrings) <= slow
 
-  for (let i = 0; i < panjang; i++) {
-    const urlString = urlStrings[i];
-    const parsedUrl = url.parse(urlString);
-    const query = querystring.parse(parsedUrl.query);
-
+  const protocolMap = {
+    "vmess:": (vrayParsedUrl,httpParsedUrl) => parseVmessUrl(vrayParsedUrl,httpParsedUrl),
+    "vless:": (vrayParsedUrl,httpParsedUrl) => parseVlessUrl(vrayParsedUrl,httpParsedUrl),
+    "trojan:": (vrayParsedUrl,httpParsedUrl) => parseTrojanUrl(vrayParsedUrl,httpParsedUrl),
+    "ss:": (vrayParsedUrl,httpParsedUrl) => parseShadowsocksUrl(vrayParsedUrl,httpParsedUrl),
+    "ssr:": (vrayParsedUrl,httpParsedUrl) => parseShadowsocksRUrl(vrayParsedUrl,httpParsedUrl),
+    "socks5:": (vrayParsedUrl,httpParsedUrl) => parseSocksUrl(vrayParsedUrl,httpParsedUrl),
+    "http:": (vrayParsedUrl,httpParsedUrl) => parseHttpUrl(vrayParsedUrl,httpParsedUrl)
+  };
+  
+  for (let i = 0; i < vrayUrlsLength; i++) {
+    const vrayString = vrayUrls[i];
+    const httpString = httpUrls[i];
+    const vrayParsedUrl = new URL(vrayString);
+    const httpParsedUrl = new URL(httpString);
+    //const query = querystring.parse(parsedUrl.query);
+  
     let configResult;
-
-    const protocolMap = {
-      "vmess:": () => parseVmessUrl(urlString),
-      "vless:": () => parseVlessUrl(parsedUrl, query),
-      "trojan:": () => parseTrojanUrl(parsedUrl, query),
-      "ss:": () => parseShadowsocksUrl(parsedUrl, query),
-      "ssr:": () => parseShadowsocksRUrl(parsedUrl, query),
-      "socks5:": () => parseSocksUrl(parsedUrl, query),
-      "http:": () => parseHttpUrl(parsedUrl, query)
-    };
-
-    if (protocolMap.hasOwnProperty(parsedUrl.protocol)) {
-      configResult = protocolMap[parsedUrl.protocol]();
+  
+    if (protocolMap.hasOwnProperty(vrayParsedUrl.protocol)) {
+      configResult = protocolMap[vrayParsedUrl.protocol](vrayParsedUrl,httpParsedUrl);
+    } else {
+      console.log("Unsupported Protocol!")
     }
-
+  
     //results.push(configResult); <= this more slower
     const panjangResult = results.length;
     results[panjangResult] = configResult;
@@ -212,7 +216,7 @@ function parseUrls(urlStrings) {
   return results;
 }
 
-const urlStrings = [
+const vrayUrls = [
   "vmess://eyJhZGQiOiAic2cyLXJheS5pcHNlcnZlcnMueHl6IiwgImhvc3QiOiAic25pLmNsb3VkZmxhcmUuY29tIiwgImFpZCI6IDAsICJ0eXBlIjogIiIsICJwYXRoIjogIi9KQUdPQU5TU0gvIiwgIm5ldCI6ICJ3cyIsICJwcyI6ICJqYWdvYW5zc2gtZ29kZGFtbiIsICJ0bHMiOiAidGxzIiwgInR5cGUiOiAibm9uZSIsICJwb3J0IjogIjQ0MyIsICJ2IjogIjIiLCAiaWQiOiAiNGE0NWU0NzctY2ZhMS00YTBmLWEwYjAtZTQ1MTczYzYyZjViIn0=",
   "vmess://eyJhZGQiOiJ1czIub2NlaXMubmV0IiwiYWlkIjoiMCIsImFscG4iOiIiLCJmcCI6IiIsImhvc3QiOiIiLCJpZCI6ImRhY2Y2MzQwLTA5ZmQtMTFlZS1iMjM2LTIwNWM2ZDVmNWQ3OCIsIm5ldCI6IndzIiwicGF0aCI6Ii92bXdzIiwicG9ydCI6IjQ0MyIsInBzIjoiVVNBK1ZNRVNTLVdTKDIwMjMtMDYtMjApIiwic2N5Ijoibm9uZSIsInNuaSI6IndoYXRzYXBwLm5ldCIsInRscyI6InRscyIsInR5cGUiOiIiLCJ2IjoiMiJ9",
   "vmess://eyJhZGQiOiJ1czIub2NlaXMubmV0IiwiYWlkIjoiMCIsImFscG4iOiIiLCJmcCI6IiIsImhvc3QiOiIiLCJpZCI6ImRhY2Y2MzQwLTA5ZmQtMTFlZS1iMjM2LTIwNWM2ZDVmNWQ3OCIsIm5ldCI6IndzIiwicGF0aCI6Ii92bXdzIiwicG9ydCI6IjgwIiwicHMiOiJVU0ErVk1FU1MtV1MgTlRMUygyMDIzLTA2LTIwKSIsInNjeSI6Im5vbmUiLCJzbmkiOiIiLCJ0bHMiOiIiLCJ0eXBlIjoiIiwidiI6IjIifQ==",
@@ -223,8 +227,10 @@ const urlStrings = [
   "trojan://6d9fdac3-d74b-435f-aa6b-5fbf36e06853@sg1.xvless.xyz:443?host=sg1.xvless.xyz&path=%2Ftrojan&sni=sg1.xvless.xyz&type=ws#sshocean-ainian",
   "trojan://dbedf072-d917-41cd-b106-3aa3bb2f29a4@idt4.sshocean.net:443?mode=gun&security=tls&type=grpc&serviceName=grpc&sni=sni.cloudflare.net#sshocean-pengentest_Trojan_gRPC"
 ];
+const httpUrls = vrayUrls.map(urlString => urlString.replace(/^[^:]+(?=:\/\/)/, 'http')); //convert v2ray urls to http url since WHATWG URL API is suck when dealing with other protocol
+
 const startTime = performance.now();
-const results = parseUrls(urlStrings);
+const results = parseUrls(vrayUrls,httpUrls);
 const endTime = performance.now();
 let diff = endTime - startTime;
 //console.log(results);
