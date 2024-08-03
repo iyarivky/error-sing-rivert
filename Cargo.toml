@@ -1,7 +1,9 @@
 [package]
-name = "sing-rivert"
+name = "sing_rivert"
 version = "0.1.0"
 edition = "2021"
+description = "v2ray to sing-box config converter"
+repository = "https://github.com/iyarivky/sing-rivert/"
 
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
